@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import dayjs from "dayjs";
 
 interface User {
@@ -13,6 +13,12 @@ interface User {
   createdAt: string;
   lastLoginAt: string | null;
 }
+
+type SortKey = "displayName" | "email" | "tenantName" | "lineUserId" | "lastLoginAt" | "active" | "createdAt";
+type SortDir = "asc" | "desc";
+
+type StatusFilter = "all" | "active" | "inactive";
+type LineFilter = "all" | "linked" | "unlinked";
 
 function Badge({ active }: { active: boolean }) {
   return (
@@ -27,10 +33,41 @@ function Badge({ active }: { active: boolean }) {
   );
 }
 
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) {
+    return (
+      <svg width="12" height="12" viewBox="0 0 12 12" className="text-gray-300 ml-1 inline-block">
+        <path d="M6 2l3 3.5H3L6 2z" fill="currentColor" />
+        <path d="M6 10L3 6.5h6L6 10z" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" className="text-gray-700 ml-1 inline-block">
+      {dir === "asc" ? (
+        <path d="M6 2l3 4H3L6 2z" fill="currentColor" />
+      ) : (
+        <path d="M6 10L3 6h6L6 10z" fill="currentColor" />
+      )}
+    </svg>
+  );
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ソート
+  const [sortKey, setSortKey] = useState<SortKey>("displayName");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // 検索
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // フィルター
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [lineFilter, setLineFilter] = useState<LineFilter>("all");
 
   // 追加フォーム
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,6 +84,85 @@ export default function AdminUsersPage() {
   // アクション確認
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
+  // ソート切替
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  // フィルター・検索・ソート適用
+  const filteredUsers = useMemo(() => {
+    let result = [...users];
+
+    // 検索（氏名、メール、テナント名で部分一致）
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (u) =>
+          u.displayName.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q) ||
+          (u.tenantName && u.tenantName.toLowerCase().includes(q))
+      );
+    }
+
+    // ステータスフィルター
+    if (statusFilter === "active") {
+      result = result.filter((u) => u.active);
+    } else if (statusFilter === "inactive") {
+      result = result.filter((u) => !u.active);
+    }
+
+    // LINE連携フィルター
+    if (lineFilter === "linked") {
+      result = result.filter((u) => u.lineUserId);
+    } else if (lineFilter === "unlinked") {
+      result = result.filter((u) => !u.lineUserId);
+    }
+
+    // ソート
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "displayName":
+          cmp = a.displayName.localeCompare(b.displayName, "ja");
+          break;
+        case "email":
+          cmp = a.email.localeCompare(b.email);
+          break;
+        case "tenantName":
+          cmp = (a.tenantName || "").localeCompare(b.tenantName || "", "ja");
+          break;
+        case "lineUserId":
+          cmp = (a.lineUserId ? 1 : 0) - (b.lineUserId ? 1 : 0);
+          break;
+        case "lastLoginAt": {
+          const ta = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+          const tb = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+          cmp = ta - tb;
+          break;
+        }
+        case "active":
+          cmp = (a.active ? 1 : 0) - (b.active ? 1 : 0);
+          break;
+        case "createdAt": {
+          const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          cmp = ca - cb;
+          break;
+        }
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [users, searchQuery, statusFilter, lineFilter, sortKey, sortDir]);
+
+  // フィルターがアクティブかどうか
+  const hasActiveFilter = statusFilter !== "all" || lineFilter !== "all" || searchQuery.trim() !== "";
 
   async function fetchUsers() {
     try {
@@ -134,6 +250,19 @@ export default function AdminUsersPage() {
     }
   }
 
+  // ソート可能なヘッダーセル
+  function SortableHeader({ label, sortKeyName, className }: { label: string; sortKeyName: SortKey; className?: string }) {
+    return (
+      <th
+        className={`text-left px-6 py-3 text-xs font-medium text-gray-500 cursor-pointer select-none hover:text-gray-800 transition-colors ${className ?? ""}`}
+        onClick={() => handleSort(sortKeyName)}
+      >
+        {label}
+        <SortIcon active={sortKey === sortKeyName} dir={sortDir} />
+      </th>
+    );
+  }
+
   return (
     <div className="p-8">
       {/* ヘッダー */}
@@ -151,6 +280,83 @@ export default function AdminUsersPage() {
           </svg>
           ユーザーを追加
         </button>
+      </div>
+
+      {/* 検索・フィルターバー */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        {/* 検索 */}
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          >
+            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="氏名・メール・テナント名で検索..."
+            className="w-full pl-9 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-gray-800 focus:ring-1 focus:ring-gray-800 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* ステータスフィルター */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className={`px-3 py-2.5 text-sm border rounded-xl bg-white focus:outline-none focus:border-gray-800 focus:ring-1 focus:ring-gray-800 transition-colors ${
+            statusFilter !== "all" ? "border-gray-800 text-gray-900" : "border-gray-200 text-gray-600"
+          }`}
+        >
+          <option value="all">すべてのステータス</option>
+          <option value="active">有効のみ</option>
+          <option value="inactive">無効のみ</option>
+        </select>
+
+        {/* LINE連携フィルター */}
+        <select
+          value={lineFilter}
+          onChange={(e) => setLineFilter(e.target.value as LineFilter)}
+          className={`px-3 py-2.5 text-sm border rounded-xl bg-white focus:outline-none focus:border-gray-800 focus:ring-1 focus:ring-gray-800 transition-colors ${
+            lineFilter !== "all" ? "border-gray-800 text-gray-900" : "border-gray-200 text-gray-600"
+          }`}
+        >
+          <option value="all">LINE連携：すべて</option>
+          <option value="linked">連携済みのみ</option>
+          <option value="unlinked">未連携のみ</option>
+        </select>
+
+        {/* フィルターリセット */}
+        {hasActiveFilter && (
+          <button
+            onClick={() => {
+              setSearchQuery("");
+              setStatusFilter("all");
+              setLineFilter("all");
+            }}
+            className="px-3 py-2.5 text-xs text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            リセット
+          </button>
+        )}
       </div>
 
       {/* 成功メッセージ */}
@@ -266,73 +472,86 @@ export default function AdminUsersPage() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-sm text-red-600">{error}</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <p className="text-sm text-gray-500">全 {users.length} 名</p>
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {hasActiveFilter ? (
+                <>
+                  <span className="font-medium text-gray-700">{filteredUsers.length}</span>
+                  <span> / {users.length} 名を表示</span>
+                </>
+              ) : (
+                <>全 {users.length} 名</>
+              )}
+            </p>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">氏名 / テナント</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">メールアドレス</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">LINE連携</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">最終ログイン</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">ステータス</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-900">{user.displayName}</p>
-                    <p className="text-xs text-gray-400">{user.tenantName || "—"}</p>
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{user.email}</td>
-                  <td className="px-6 py-4">
-                    {user.lineUserId ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                          <path d="M8.5 1.5l-5 5L1 4"/>
-                        </svg>
-                        連携済み
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">未連携</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gray-500">
-                    {user.lastLoginAt ? dayjs(user.lastLoginAt).format("YYYY/M/D HH:mm") : "—"}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge active={user.active} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleActive(user)}
-                        className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
-                          user.active
-                            ? "border-red-200 text-red-600 hover:bg-red-50"
-                            : "border-green-200 text-green-600 hover:bg-green-50"
-                        }`}
-                      >
-                        {user.active ? "無効化" : "有効化"}
-                      </button>
-                      <button
-                        onClick={() => setResetTarget(user)}
-                        className="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
-                      >
-                        PW リセット
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <SortableHeader label="氏名 / テナント" sortKeyName="displayName" />
+                  <SortableHeader label="メールアドレス" sortKeyName="email" />
+                  <SortableHeader label="LINE連携" sortKeyName="lineUserId" />
+                  <SortableHeader label="最終ログイン" sortKeyName="lastLoginAt" />
+                  <SortableHeader label="ステータス" sortKeyName="active" />
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {users.length === 0 && (
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900">{user.displayName}</p>
+                      <p className="text-xs text-gray-400">{user.tenantName || "—"}</p>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{user.email}</td>
+                    <td className="px-6 py-4">
+                      {user.lineUserId ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                            <path d="M8.5 1.5l-5 5L1 4"/>
+                          </svg>
+                          連携済み
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">未連携</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500">
+                      {user.lastLoginAt ? dayjs(user.lastLoginAt).format("YYYY/M/D HH:mm") : "—"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge active={user.active} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+                            user.active
+                              ? "border-red-200 text-red-600 hover:bg-red-50"
+                              : "border-green-200 text-green-600 hover:bg-green-50"
+                          }`}
+                        >
+                          {user.active ? "無効化" : "有効化"}
+                        </button>
+                        <button
+                          onClick={() => setResetTarget(user)}
+                          className="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
+                        >
+                          PW リセット
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredUsers.length === 0 && (
             <div className="px-6 py-12 text-center text-sm text-gray-400">
-              ユーザーがいません。まず追加してください。
+              {hasActiveFilter
+                ? "条件に一致するユーザーが見つかりません。"
+                : "ユーザーがいません。まず追加してください。"}
             </div>
           )}
         </div>
