@@ -1,59 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/events/[eventId]/good
- * グッド数と、リクエストしたユーザーがグッド済みかを返す
- */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { eventId: string } }
-) {
-  const { eventId } = params;
-  const userId = req.headers.get("x-line-user-id") ?? "";
-
-  const db = getDb();
-  const goodsRef = db.collection("events").doc(eventId).collection("goods");
-  const snap = await goodsRef.get();
-
-  const count = snap.size;
-  const liked = userId ? snap.docs.some((d) => d.id === userId) : false;
-
-  return NextResponse.json({ eventId, count, liked });
-}
-
-/**
  * POST /api/events/[eventId]/good
- * グッドのトグル（追加 or 削除）
+ * 匿名グッド: action = "add" で +1、"remove" で -1
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { eventId: string } }
 ) {
   const { eventId } = params;
-  const userId = req.headers.get("x-line-user-id");
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let action: string;
+  try {
+    const body = await req.json();
+    action = body.action;
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  if (action !== "add" && action !== "remove") {
+    return NextResponse.json({ error: "action must be 'add' or 'remove'" }, { status: 400 });
   }
 
   const db = getDb();
-  const goodRef = db
-    .collection("events")
-    .doc(eventId)
-    .collection("goods")
-    .doc(userId);
+  const eventRef = db.collection("events").doc(eventId);
 
-  const existing = await goodRef.get();
-
-  if (existing.exists) {
-    // すでにグッド済み → 削除
-    await goodRef.delete();
-    return NextResponse.json({ eventId, liked: false });
-  } else {
-    // グッド追加
-    await goodRef.set({ createdAt: new Date().toISOString() });
-    return NextResponse.json({ eventId, liked: true });
+  // ドキュメント存在チェック
+  const doc = await eventRef.get();
+  if (!doc.exists) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
+
+  const delta = action === "add" ? 1 : -1;
+
+  await eventRef.update({
+    goodCount: FieldValue.increment(delta),
+  });
+
+  // 更新後の値を返す（最小 0 に補正）
+  const updated = await eventRef.get();
+  const goodCount = Math.max(0, updated.data()?.goodCount ?? 0);
+
+  // 万が一マイナスになった場合は 0 に修正
+  if ((updated.data()?.goodCount ?? 0) < 0) {
+    await eventRef.update({ goodCount: 0 });
+  }
+
+  return NextResponse.json({ eventId, goodCount });
 }

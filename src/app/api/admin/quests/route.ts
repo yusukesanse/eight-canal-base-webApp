@@ -17,21 +17,11 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb();
     const snap = await db.collection("quests").orderBy("createdAt", "desc").get();
-    // グッド数を並行取得
-    const quests = await Promise.all(
-      snap.docs.map(async (doc) => {
-        const goodsSnap = await db
-          .collection("quests")
-          .doc(doc.id)
-          .collection("goods")
-          .get();
-        return {
-          questId: doc.id,
-          ...doc.data(),
-          goodCount: goodsSnap.size,
-        };
-      })
-    );
+    const quests = snap.docs.map((doc) => ({
+      questId: doc.id,
+      ...doc.data(),
+      goodCount: doc.data().goodCount ?? 0,
+    }));
     return NextResponse.json({ quests });
   } catch (error) {
     console.error("[admin/quests] GET error:", error);

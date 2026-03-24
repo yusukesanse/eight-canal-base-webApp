@@ -2,8 +2,26 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { TopBar } from "@/components/ui/TopBar";
-import { tryGetLineUserId, loginWithLine } from "@/lib/liff";
 import type { Quest, UserQuestProgress } from "@/types";
+
+/* ───────── localStorage ヘルパー ───────── */
+
+const GOOD_KEY = "quest_goods";
+
+function getGoodSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(GOOD_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveGoodSet(s: Set<string>) {
+  localStorage.setItem(GOOD_KEY, JSON.stringify(Array.from(s)));
+}
+
+/* ───────── 型 ───────── */
 
 interface QuestWithProgress extends Quest {
   progress?: UserQuestProgress;
@@ -15,73 +33,97 @@ export default function QuestsPage() {
   const [quests, setQuests] = useState<QuestWithProgress[]>([]);
   const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const uid = await tryGetLineUserId();
-        if (uid) setUserId(uid);
-
-        const headers: Record<string, string> = {};
-        if (uid) headers["x-line-user-id"] = uid;
-
-        const res = await fetch("/api/quests", { headers });
+        const res = await fetch("/api/quests");
         const d = await res.json();
-        setQuests(d.quests ?? []);
+        const goodSet = getGoodSet();
+
+        const list: QuestWithProgress[] = (d.quests ?? []).map(
+          (q: Quest & { goodCount?: number; progress?: UserQuestProgress }) => ({
+            ...q,
+            goodCount: q.goodCount ?? 0,
+            liked: goodSet.has(q.questId),
+          })
+        );
+        setQuests(list);
         setPoints(d.totalPoints ?? 0);
       } catch {
-        // LIFF 初期化失敗時もクエスト一覧は表示
+        // API エラー時もUI表示
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const handleToggleGood = useCallback(
-    async (questId: string) => {
-      if (!userId) {
-        // 未ログイン → LINE ログインへリダイレクト
-        await loginWithLine();
-        return;
-      }
+  const handleToggleGood = useCallback(async (questId: string) => {
+    const goodSet = getGoodSet();
+    const wasLiked = goodSet.has(questId);
+    const action = wasLiked ? "remove" : "add";
 
-      // 楽観的UI更新
+    // 楽観的UI更新
+    setQuests((prev) =>
+      prev.map((q) =>
+        q.questId === questId
+          ? {
+              ...q,
+              liked: !wasLiked,
+              goodCount: wasLiked
+                ? Math.max(0, q.goodCount - 1)
+                : q.goodCount + 1,
+            }
+          : q
+      )
+    );
+
+    // localStorage を更新
+    if (wasLiked) {
+      goodSet.delete(questId);
+    } else {
+      goodSet.add(questId);
+    }
+    saveGoodSet(goodSet);
+
+    try {
+      const res = await fetch(`/api/quests/${questId}/good`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error();
+
+      const data = await res.json();
+      setQuests((prev) =>
+        prev.map((q) =>
+          q.questId === questId ? { ...q, goodCount: data.goodCount } : q
+        )
+      );
+    } catch {
+      // 失敗時はロールバック
+      if (wasLiked) {
+        goodSet.add(questId);
+      } else {
+        goodSet.delete(questId);
+      }
+      saveGoodSet(goodSet);
+
       setQuests((prev) =>
         prev.map((q) =>
           q.questId === questId
             ? {
                 ...q,
-                liked: !q.liked,
-                goodCount: q.liked ? q.goodCount - 1 : q.goodCount + 1,
+                liked: wasLiked,
+                goodCount: wasLiked
+                  ? q.goodCount + 1
+                  : Math.max(0, q.goodCount - 1),
               }
             : q
         )
       );
-
-      try {
-        const res = await fetch(`/api/quests/${questId}/good`, {
-          method: "POST",
-          headers: { "x-line-user-id": userId },
-        });
-        if (!res.ok) throw new Error();
-      } catch {
-        // 失敗時はロールバック
-        setQuests((prev) =>
-          prev.map((q) =>
-            q.questId === questId
-              ? {
-                  ...q,
-                  liked: !q.liked,
-                  goodCount: q.liked ? q.goodCount - 1 : q.goodCount + 1,
-                }
-              : q
-          )
-        );
-      }
-    },
-    [userId]
-  );
+    }
+  }, []);
 
   const active    = quests.filter((q) => !q.progress?.completed);
   const completed = quests.filter((q) => q.progress?.completed);

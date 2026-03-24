@@ -2,12 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { TopBar } from "@/components/ui/TopBar";
-import { tryGetLineUserId, loginWithLine } from "@/lib/liff";
 import type { NufEvent } from "@/types";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import "dayjs/locale/ja";
 dayjs.locale("ja");
+
+/* ───────── localStorage ヘルパー ───────── */
+
+const GOOD_KEY = "event_goods";
+
+function getGoodSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(GOOD_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveGoodSet(s: Set<string>) {
+  localStorage.setItem(GOOD_KEY, JSON.stringify(Array.from(s)));
+}
+
+/* ───────── 型 ───────── */
 
 interface EventWithGood extends NufEvent {
   goodCount: number;
@@ -28,66 +46,92 @@ function getCategoryStyle(cat: string) {
 export default function EventsPage() {
   const [events, setEvents] = useState<EventWithGood[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     (async () => {
-      const uid = await tryGetLineUserId();
-      if (uid) setUserId(uid);
-      const headers: Record<string, string> = {};
-      if (uid) headers["x-line-user-id"] = uid;
-
-      const res = await fetch("/api/events", { headers });
+      const res = await fetch("/api/events");
       const d = await res.json();
-      setEvents(d.events ?? []);
+      const goodSet = getGoodSet();
+
+      const list: EventWithGood[] = (d.events ?? []).map(
+        (ev: NufEvent & { goodCount?: number }) => ({
+          ...ev,
+          goodCount: ev.goodCount ?? 0,
+          liked: goodSet.has(ev.eventId),
+        })
+      );
+      setEvents(list);
       setLoading(false);
     })();
   }, []);
 
-  const handleToggleGood = useCallback(
-    async (eventId: string) => {
-      if (!userId) {
-        // 未ログイン → LINE ログインへリダイレクト
-        await loginWithLine();
-        return;
-      }
+  const handleToggleGood = useCallback(async (eventId: string) => {
+    const goodSet = getGoodSet();
+    const wasLiked = goodSet.has(eventId);
+    const action = wasLiked ? "remove" : "add";
 
-      // 楽観的UI更新
+    // 楽観的UI更新
+    setEvents((prev) =>
+      prev.map((ev) =>
+        ev.eventId === eventId
+          ? {
+              ...ev,
+              liked: !wasLiked,
+              goodCount: wasLiked
+                ? Math.max(0, ev.goodCount - 1)
+                : ev.goodCount + 1,
+            }
+          : ev
+      )
+    );
+
+    // localStorage を更新
+    if (wasLiked) {
+      goodSet.delete(eventId);
+    } else {
+      goodSet.add(eventId);
+    }
+    saveGoodSet(goodSet);
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/good`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error();
+
+      // サーバーの正確な値で補正
+      const data = await res.json();
+      setEvents((prev) =>
+        prev.map((ev) =>
+          ev.eventId === eventId ? { ...ev, goodCount: data.goodCount } : ev
+        )
+      );
+    } catch {
+      // 失敗時はロールバック
+      if (wasLiked) {
+        goodSet.add(eventId);
+      } else {
+        goodSet.delete(eventId);
+      }
+      saveGoodSet(goodSet);
+
       setEvents((prev) =>
         prev.map((ev) =>
           ev.eventId === eventId
             ? {
                 ...ev,
-                liked: !ev.liked,
-                goodCount: ev.liked ? ev.goodCount - 1 : ev.goodCount + 1,
+                liked: wasLiked,
+                goodCount: wasLiked
+                  ? ev.goodCount + 1
+                  : Math.max(0, ev.goodCount - 1),
               }
             : ev
         )
       );
-
-      try {
-        const res = await fetch(`/api/events/${eventId}/good`, {
-          method: "POST",
-          headers: { "x-line-user-id": userId },
-        });
-        if (!res.ok) throw new Error();
-      } catch {
-        // 失敗時はロールバック
-        setEvents((prev) =>
-          prev.map((ev) =>
-            ev.eventId === eventId
-              ? {
-                  ...ev,
-                  liked: !ev.liked,
-                  goodCount: ev.liked ? ev.goodCount - 1 : ev.goodCount + 1,
-                }
-              : ev
-          )
-        );
-      }
-    },
-    [userId]
-  );
+    }
+  }, []);
 
   return (
     <div>
