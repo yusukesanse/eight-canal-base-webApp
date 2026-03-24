@@ -17,6 +17,7 @@
     "googleapis": "^140.0.1",
     "jose": "^6.2.2",
     "next": "14.2.5",
+    "uuid": "^10.0.0",
     "react": "^18",
     "react-dom": "^18"
   },
@@ -24,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10",
     "eslint": "^8",
     "eslint-config-next": "14.2.5",
