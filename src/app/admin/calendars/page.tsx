@@ -9,14 +9,14 @@ interface FacilityForm {
   name: string;
   calendarId: string;
   type: FacilityType;
-  capacity: number;
+  capacity: string;
 }
 
 const EMPTY_FORM: FacilityForm = {
   name: "",
   calendarId: "",
   type: "meeting_room",
-  capacity: 1,
+  capacity: "",
 };
 
 /* ───────── メインコンポーネント ───────── */
@@ -82,7 +82,7 @@ export default function CalendarsPage() {
       name: facility.name,
       calendarId: facility.calendarId,
       type: facility.type,
-      capacity: facility.capacity,
+      capacity: String(facility.capacity),
     });
     setShowModal(true);
   }
@@ -108,7 +108,7 @@ export default function CalendarsPage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ id: editingId, ...form }),
+          body: JSON.stringify({ id: editingId, ...form, capacity: Number(form.capacity) }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -121,7 +121,7 @@ export default function CalendarsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, capacity: Number(form.capacity) }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -399,7 +399,9 @@ export default function CalendarsPage() {
                   min={1}
                   max={1000}
                   value={form.capacity}
-                  onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                  onFocus={(e) => { if (e.target.value === "0") setForm({ ...form, capacity: "" }); }}
+                  placeholder="例: 6"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   required
                 />
