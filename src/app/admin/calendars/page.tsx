@@ -395,12 +395,14 @@ export default function CalendarsPage() {
                   定員 <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
-                  min={1}
-                  max={1000}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={form.capacity}
-                  onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                  onFocus={(e) => { if (e.target.value === "0") setForm({ ...form, capacity: "" }); }}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9]/g, "");
+                    setForm({ ...form, capacity: v });
+                  }}
                   placeholder="例: 6"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   required
