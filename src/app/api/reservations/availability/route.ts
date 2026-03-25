@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const facility = getFacilityById(facilityId);
+  const facility = await getFacilityById(facilityId);
   if (!facility) {
     return NextResponse.json({ error: "Facility not found" }, { status: 404 });
   }

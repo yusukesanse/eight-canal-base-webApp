@@ -44,7 +44,7 @@ export async function DELETE(
     if (data.googleEventId) {
       try {
         const { getFacilityById } = await import("@/lib/facilities");
-        const facility = getFacilityById(data.facilityId);
+        const facility = await getFacilityById(data.facilityId);
         if (facility) {
           await deleteCalendarEvent(facility.calendarId, data.googleEventId);
         }

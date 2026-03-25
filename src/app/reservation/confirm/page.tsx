@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/ui/TopBar";
-import { getFacilityById } from "@/lib/facilities";
+import type { Facility } from "@/types";
 import { getLineProfile } from "@/lib/liff";
 
 import clsx from "clsx";
@@ -21,7 +21,7 @@ function ConfirmContent() {
   const startTime  = params.get("startTime") ?? "";
   const endTime    = params.get("endTime") ?? "";
 
-  const facility = getFacilityById(facilityId);
+  const [facility, setFacility] = useState<Facility | null>(null);
   const dateLabel = dayjs(date).format("M月D日（ddd）");
 
   const [step, setStep] = useState<Step>("confirm");
@@ -29,6 +29,18 @@ function ConfirmContent() {
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // 施設情報を取得
+  useEffect(() => {
+    if (!facilityId) return;
+    fetch("/api/facilities")
+      .then((r) => r.json())
+      .then((data) => {
+        const found = (data.facilities as Facility[])?.find((f) => f.id === facilityId);
+        setFacility(found ?? null);
+      })
+      .catch(() => {});
+  }, [facilityId]);
 
   useEffect(() => {
     // LINE プロフィールは表示名取得のみ使用（認証はセッションCookieで行う）

@@ -61,7 +61,7 @@ export async function DELETE(
   }
 
   // Google Calendar からイベント削除
-  const facility = getFacilityById(reservation.facilityId);
+  const facility = await getFacilityById(reservation.facilityId);
   if (facility) {
     try {
       await deleteCalendarEvent(facility.calendarId, reservation.googleEventId);

@@ -21,6 +21,10 @@ export interface Facility {
   type: FacilityType;
   capacity: number;
   calendarId: string;  // Google Calendar ID
+  active?: boolean;    // 有効/無効（デフォルト true）
+  order?: number;      // 表示順
+  createdAt?: string;  // ISO8601
+  updatedAt?: string;  // ISO8601
 }
 
 // ─── 予約 ────────────────────────────────────────────────────────────────────

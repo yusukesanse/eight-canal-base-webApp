@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/ui/TopBar";
-import { getFacilityById } from "@/lib/facilities";
+import type { Facility } from "@/types";
 import type { AvailabilityResponse } from "@/types";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -36,11 +36,23 @@ function TimeslotContent() {
   const facilityId = params.get("facilityId") ?? "";
   const date = params.get("date") ?? "";
 
-  const facility = getFacilityById(facilityId);
+  const [facility, setFacility] = useState<Facility | null>(null);
   const dateLabel = dayjs(date).format("M月D日（ddd）");
 
   const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 施設情報を取得
+  useEffect(() => {
+    if (!facilityId) return;
+    fetch("/api/facilities")
+      .then((r) => r.json())
+      .then((data) => {
+        const found = (data.facilities as Facility[])?.find((f) => f.id === facilityId);
+        setFacility(found ?? null);
+      })
+      .catch(() => {});
+  }, [facilityId]);
   const [selStart, setSelStart] = useState<string | null>(null);
   const [selEnd, setSelEnd] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);

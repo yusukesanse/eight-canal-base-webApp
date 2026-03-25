@@ -42,6 +42,14 @@ const NAV_LINKS = [
       <path d="M8 2l1.8 3.6L14 6.4l-3 2.9.7 4.1L8 11.4l-3.7 2 .7-4.1L2 6.4l4.2-.8L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
     </svg>
   )},
+  { href: "/admin/calendars", label: "カレンダー連携", exact: false, icon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M5 1v2M11 1v2M1 7h14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      <circle cx="10.5" cy="10.5" r="1" fill="currentColor"/>
+      <path d="M10.5 10.5l1.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  )},
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

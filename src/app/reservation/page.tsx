@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/ui/TopBar";
-import { FACILITIES } from "@/lib/facilities";
 import type { Facility } from "@/types";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -44,6 +43,7 @@ function getMondayOf(d: dayjs.Dayjs): dayjs.Dayjs {
 export default function ReservationPage() {
   const router = useRouter();
 
+  const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [weekStart, setWeekStart] = useState<dayjs.Dayjs>(() => getMondayOf(dayjs()));
   const [weekData, setWeekData] = useState<Record<string, { start: string; end: string }[]>>({});
@@ -59,6 +59,14 @@ export default function ReservationPage() {
 
   // 月〜金の5日
   const weekDays = Array.from({ length: 5 }, (_, i) => weekStart.add(i, "day"));
+
+  // 施設一覧をAPIから取得
+  useEffect(() => {
+    fetch("/api/facilities")
+      .then((r) => r.json())
+      .then((data) => setFacilities(data.facilities ?? []))
+      .catch(() => setFacilities([]));
+  }, []);
 
   // 施設 or 週が変わったらデータ取得
   useEffect(() => {
@@ -161,8 +169,8 @@ export default function ReservationPage() {
   }
 
   const canReserve = !!(selectedFacility && selDate && selStart && selEnd);
-  const meetingRooms = FACILITIES.filter((f) => f.type === "meeting_room");
-  const booths = FACILITIES.filter((f) => f.type === "booth");
+  const meetingRooms = facilities.filter((f) => f.type === "meeting_room");
+  const booths = facilities.filter((f) => f.type === "booth");
 
   // ─── レンダリング ──────────────────────────────────────────────────────────
   return (
