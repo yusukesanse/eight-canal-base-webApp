@@ -23,6 +23,34 @@ const ALLOWED_UPDATE_FIELDS = [
   "openTime", "closeTime", "availableDays",
 ];
 
+const TIME_REGEX = /^\d{2}:\d{2}$/;
+
+/** openTime / closeTime / availableDays の共通バリデーション */
+function validateScheduleFields(body: Record<string, unknown>): string | null {
+  const { openTime, closeTime, availableDays } = body;
+  if (openTime !== undefined) {
+    if (typeof openTime !== "string" || !TIME_REGEX.test(openTime)) {
+      return "openTime は HH:MM 形式で指定してください";
+    }
+  }
+  if (closeTime !== undefined) {
+    if (typeof closeTime !== "string" || !TIME_REGEX.test(closeTime)) {
+      return "closeTime は HH:MM 形式で指定してください";
+    }
+  }
+  if (openTime && closeTime && openTime >= closeTime) {
+    return "closeTime は openTime より後に設定してください";
+  }
+  if (availableDays !== undefined) {
+    if (!Array.isArray(availableDays) ||
+        availableDays.length === 0 ||
+        !availableDays.every((d: unknown) => typeof d === "number" && d >= 0 && d <= 6)) {
+      return "availableDays は 0〜6 の数値配列（1件以上）で指定してください";
+    }
+  }
+  return null;
+}
+
 /**
  * GET /api/admin/facilities
  * 施設一覧取得（非アクティブ含む）
@@ -80,6 +108,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
+  const scheduleError = validateScheduleFields(body);
+  if (scheduleError) {
+    return NextResponse.json({ error: scheduleError }, { status: 400 });
+  }
+
   const facility = await createFacility({
     name,
     calendarId,
@@ -123,6 +156,11 @@ export async function PUT(req: NextRequest) {
   const validationError = validateFields(body, VALIDATION_RULES);
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const scheduleError = validateScheduleFields(body);
+  if (scheduleError) {
+    return NextResponse.json({ error: scheduleError }, { status: 400 });
   }
 
   const updateData = pickAllowedFields(body, ALLOWED_UPDATE_FIELDS);

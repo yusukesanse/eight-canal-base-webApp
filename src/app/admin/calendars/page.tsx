@@ -112,6 +112,10 @@ export default function CalendarsPage() {
       setError("利用可能曜日を1日以上選択してください");
       return;
     }
+    if (form.openTime >= form.closeTime) {
+      setError("利用終了時刻は開始時刻より後に設定してください");
+      return;
+    }
     setSubmitting(true);
     setError("");
     setSuccess("");
