@@ -1,4 +1,4 @@
-# LINE ミニアプリ — 引き継ぎドキュメント
+# EIGHT CANAL BASE — 引き継ぎドキュメント
 
 Eight Design 共有オフィス予約システム。LINE LIFF（LINE Front-end Framework）上で動作する Next.js アプリ。
 
@@ -8,9 +8,9 @@ Eight Design 共有オフィス予約システム。LINE LIFF（LINE Front-end F
 
 | 用途 | URL |
 |------|-----|
-| **Vercel ダッシュボード** | https://vercel.com/nakagawa-share-office/nakagawa-share-office-app |
+| **Vercel ダッシュボード** | https://vercel.com/yusukesanses-projects/nakagawa-share-office-app |
 | **本番 URL** | https://nakagawa-share-office-app.vercel.app |
-| **GitHub リポジトリ** | ※ローカルのみ（リモート未設定）→ 引き継ぎ時に GitHub に push すること |
+| **GitHub リポジトリ** | https://github.com/yusukesanse/eight-canal-base-webApp |
 | **LINE Developers Console** | https://developers.line.biz/ |
 | **Firebase Console** | https://console.firebase.google.com/ |
 | **Google Cloud Console** | https://console.cloud.google.com/ |
