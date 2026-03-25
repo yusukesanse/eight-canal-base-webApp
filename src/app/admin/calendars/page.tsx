@@ -10,13 +10,21 @@ interface FacilityForm {
   calendarId: string;
   type: FacilityType;
   capacity: string;
+  openTime: string;
+  closeTime: string;
+  availableDays: number[];
 }
+
+const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 const EMPTY_FORM: FacilityForm = {
   name: "",
   calendarId: "",
   type: "meeting_room",
   capacity: "",
+  openTime: "09:00",
+  closeTime: "18:00",
+  availableDays: [1, 2, 3, 4, 5],
 };
 
 /* ───────── メインコンポーネント ───────── */
@@ -83,6 +91,9 @@ export default function CalendarsPage() {
       calendarId: facility.calendarId,
       type: facility.type,
       capacity: String(facility.capacity),
+      openTime: facility.openTime ?? "09:00",
+      closeTime: facility.closeTime ?? "18:00",
+      availableDays: facility.availableDays ?? [1, 2, 3, 4, 5],
     });
     setShowModal(true);
   }
@@ -97,6 +108,10 @@ export default function CalendarsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.availableDays.length === 0) {
+      setError("利用可能曜日を1日以上選択してください");
+      return;
+    }
     setSubmitting(true);
     setError("");
     setSuccess("");
@@ -108,7 +123,11 @@ export default function CalendarsPage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ id: editingId, ...form, capacity: Number(form.capacity) }),
+          body: JSON.stringify({
+            id: editingId,
+            ...form,
+            capacity: Number(form.capacity),
+          }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -282,6 +301,13 @@ export default function CalendarsPage() {
                     <p className="text-xs text-gray-500 mt-1">
                       定員: {f.capacity}名
                     </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      🕐 {f.openTime ?? "09:00"} 〜 {f.closeTime ?? "18:00"}
+
+                      {(f.availableDays ?? [1, 2, 3, 4, 5])
+                        .map((d) => DAY_LABELS[d])
+                        .join("・")}
+                    </p>
                     <p className="text-xs text-gray-400 mt-0.5 font-mono break-all">
                       📅 {f.calendarId}
                     </p>
@@ -407,6 +433,64 @@ export default function CalendarsPage() {
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   required
                 />
+              </div>
+
+              {/* 利用時間 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  利用可能時間 <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={form.openTime}
+                    onChange={(e) => setForm({ ...form, openTime: e.target.value })}
+                    className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    required
+                  />
+                  <span className="text-sm text-gray-500 shrink-0">〜</span>
+                  <input
+                    type="time"
+                    value={form.closeTime}
+                    onChange={(e) => setForm({ ...form, closeTime: e.target.value })}
+                    className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 利用可能曜日 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  利用可能曜日 <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {DAY_LABELS.map((label, dayNum) => {
+                    const checked = form.availableDays.includes(dayNum);
+                    return (
+                      <button
+                        key={dayNum}
+                        type="button"
+                        onClick={() => {
+                          const next = checked
+                            ? form.availableDays.filter((d) => d !== dayNum)
+                            : [...form.availableDays, dayNum].sort((a, b) => a - b);
+                          setForm({ ...form, availableDays: next });
+                        }}
+                        className={`w-9 h-9 rounded-full text-sm font-medium transition-colors ${
+                          checked
+                            ? "bg-gray-900 text-white"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.availableDays.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">1日以上選択してください</p>
+                )}
               </div>
 
               {/* ボタン */}

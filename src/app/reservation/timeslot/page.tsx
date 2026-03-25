@@ -10,18 +10,16 @@ import dayjs from "dayjs";
 import "dayjs/locale/ja";
 dayjs.locale("ja");
 
-// 15分単位のスロット生成 (09:00〜18:00)
-function generateSlots(): string[] {
+// 15分単位のスロット生成
+function generateSlots(startMin: number, endMin: number): string[] {
   const slots: string[] = [];
-  for (let h = 9; h < 18; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
+  for (let t = startMin; t < endMin; t += 15) {
+    const h = Math.floor(t / 60);
+    const m = t % 60;
+    slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
   }
   return slots;
 }
-
-const ALL_SLOTS = generateSlots();
 
 function timeToMin(t: string) {
   const [h, m] = t.split(":").map(Number);
@@ -41,6 +39,7 @@ function TimeslotContent() {
 
   const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [allSlots, setAllSlots] = useState<string[]>(() => generateSlots(9 * 60, 18 * 60));
 
   // 施設情報を取得
   useEffect(() => {
@@ -50,6 +49,11 @@ function TimeslotContent() {
       .then((data) => {
         const found = (data.facilities as Facility[])?.find((f) => f.id === facilityId);
         setFacility(found ?? null);
+        if (found) {
+          const [oh, om] = (found.openTime ?? "09:00").split(":").map(Number);
+          const [ch, cm] = (found.closeTime ?? "18:00").split(":").map(Number);
+          setAllSlots(generateSlots(oh * 60 + om, ch * 60 + cm));
+        }
       })
       .catch(() => {});
   }, [facilityId]);
@@ -179,7 +183,7 @@ function TimeslotContent() {
                 </tr>
               </thead>
               <tbody>
-                {ALL_SLOTS.map((slot) => {
+                {allSlots.map((slot) => {
                   const state = getCellState(slot);
                   const isHourBoundary = slot.endsWith(":00");
                   return (

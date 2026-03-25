@@ -6,7 +6,8 @@ import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 /**
- * 1週間分（月〜金）の予約済みスロットを取得する。
+ * 1週間分（月曜起点の7日間）の予約済みスロットを取得する。
+ * 施設の availableDays に含まれない日は空配列を返す。
  * Query: facilityId, weekStart (YYYY-MM-DD の月曜日)
  * Response: { [date: string]: { start: string; end: string }[] }
  */
@@ -27,13 +28,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Facility not found" }, { status: 404 });
   }
 
+  const availableDays = facility.availableDays ?? [1, 2, 3, 4, 5];
+
   try {
-    // 月〜金の5日分を並列取得
+    // 月曜起点の7日分を並列取得（利用不可曜日は空配列）
     const result: Record<string, { start: string; end: string }[]> = {};
 
     await Promise.all(
-      Array.from({ length: 5 }, (_, i) => {
-        const date = dayjs(weekStart).add(i, "day").format("YYYY-MM-DD");
+      Array.from({ length: 7 }, (_, i) => {
+        const d = dayjs(weekStart).add(i, "day");
+        const date = d.format("YYYY-MM-DD");
+        if (!availableDays.includes(d.day())) {
+          result[date] = [];
+          return Promise.resolve();
+        }
         return getBookedSlots(facility.calendarId, date).then((slots) => {
           result[date] = slots;
         });

@@ -20,6 +20,7 @@ const VALIDATION_RULES = {
 
 const ALLOWED_UPDATE_FIELDS = [
   "name", "type", "capacity", "calendarId", "active", "order",
+  "openTime", "closeTime", "availableDays",
 ];
 
 /**
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
     capacity: Number(capacity),
     active: body.active ?? true,
     order: body.order,
+    openTime: body.openTime ?? "09:00",
+    closeTime: body.closeTime ?? "18:00",
+    availableDays: body.availableDays ?? [1, 2, 3, 4, 5],
   });
 
   return NextResponse.json({ facility }, { status: 201 });

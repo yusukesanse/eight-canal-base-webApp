@@ -23,6 +23,9 @@ export interface Facility {
   calendarId: string;  // Google Calendar ID
   active?: boolean;    // 有効/無効（デフォルト true）
   order?: number;      // 表示順
+  openTime?: string;       // 利用開始時刻 "HH:MM"（デフォルト "09:00"）
+  closeTime?: string;      // 利用終了時刻 "HH:MM"（デフォルト "18:00"）
+  availableDays?: number[]; // 利用可能曜日 0=日〜6=土（デフォルト [1,2,3,4,5]）
   createdAt?: string;  // ISO8601
   updatedAt?: string;  // ISO8601
 }

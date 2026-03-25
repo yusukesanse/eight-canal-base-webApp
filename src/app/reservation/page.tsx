@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/ui/TopBar";
@@ -12,19 +12,17 @@ dayjs.locale("ja");
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
 
-const WEEK_DAYS_JA = ["月", "火", "水", "木", "金"];
+const DAY_LABELS_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
-function generateSlots(): string[] {
+function generateSlots(startMin: number, endMin: number): string[] {
   const slots: string[] = [];
-  for (let h = 9; h < 18; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
+  for (let t = startMin; t < endMin; t += 15) {
+    const h = Math.floor(t / 60);
+    const m = t % 60;
+    slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
   }
   return slots;
 }
-
-const ALL_SLOTS = generateSlots();
 
 function timeToMin(t: string) {
   const [h, m] = t.split(":").map(Number);
@@ -57,8 +55,19 @@ export default function ReservationPage() {
   const today = dayjs().format("YYYY-MM-DD");
   const maxDate = dayjs().add(30, "day").format("YYYY-MM-DD");
 
-  // 月〜金の5日
-  const weekDays = Array.from({ length: 5 }, (_, i) => weekStart.add(i, "day"));
+  // 施設の利用可能曜日に基づいて表示する日を決定
+  const weekDays = useMemo(() => {
+    const days = selectedFacility?.availableDays ?? [1, 2, 3, 4, 5];
+    return Array.from({ length: 7 }, (_, i) => weekStart.add(i, "day"))
+      .filter((d) => days.includes(d.day()));
+  }, [selectedFacility?.availableDays, weekStart.format("YYYY-MM-DD")]);
+
+  // 施設の利用時間に基づいてタイムスロットを生成
+  const ALL_SLOTS = useMemo(() => {
+    const [oh, om] = (selectedFacility?.openTime ?? "09:00").split(":").map(Number);
+    const [ch, cm] = (selectedFacility?.closeTime ?? "18:00").split(":").map(Number);
+    return generateSlots(oh * 60 + om, ch * 60 + cm);
+  }, [selectedFacility?.openTime, selectedFacility?.closeTime]);
 
   // 施設一覧をAPIから取得
   useEffect(() => {
@@ -236,7 +245,9 @@ export default function ReservationPage() {
           ‹
         </button>
         <span className="text-xs font-medium text-gray-600">
-          {weekStart.format("M/D")}（月）〜 {weekStart.add(4, "day").format("M/D")}（金）
+          {weekDays.length > 0
+            ? `${weekDays[0].format("M/D")}（${DAY_LABELS_JA[weekDays[0].day()]}）〜 ${weekDays[weekDays.length - 1].format("M/D")}（${DAY_LABELS_JA[weekDays[weekDays.length - 1].day()]}）`
+            : weekStart.format("M/D") + " 〜"}
         </span>
         <button
           className="w-7 h-7 flex items-center justify-center rounded-full text-lg text-gray-400 hover:bg-gray-100 transition-colors"
@@ -293,7 +304,7 @@ export default function ReservationPage() {
                               : "text-gray-500"
                           )}
                         >
-                          <div>{WEEK_DAYS_JA[i]}</div>
+                          <div>{DAY_LABELS_JA[d.day()]}</div>
                           <div>{d.format("M/D")}</div>
                         </span>
                       </th>

@@ -5,10 +5,6 @@ import type { AvailabilityResponse } from "@/types";
 
 export const dynamic = "force-dynamic";
 
-// 営業時間（分）
-const OPEN_MINUTES  = 9 * 60;   // 9:00
-const CLOSE_MINUTES = 18 * 60;  // 18:00
-
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const facilityId = searchParams.get("facilityId");
@@ -28,6 +24,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Facility not found" }, { status: 404 });
   }
 
+  // 施設ごとの利用時間設定（デフォルト: 9:00〜18:00、平日のみ）
+  const [oh, om] = (facility.openTime ?? "09:00").split(":").map(Number);
+  const [ch, cm] = (facility.closeTime ?? "18:00").split(":").map(Number);
+  const OPEN_MINUTES  = oh * 60 + om;
+  const CLOSE_MINUTES = ch * 60 + cm;
+  const availableDays = facility.availableDays ?? [1, 2, 3, 4, 5];
+
   // startTime/endTime が省略された場合は予約済みスロット一覧だけ返す（タイムスロット画面の初期ロード用）
   if (!startTime || !endTime) {
     const bookedSlots = await getBookedSlots(facility.calendarId, date);
@@ -41,14 +44,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(res);
   }
 
-  // 土日チェック
+  // 利用可能曜日チェック
   const dayOfWeek = new Date(date).getDay();
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
+  if (!availableDays.includes(dayOfWeek)) {
     const res: AvailabilityResponse = { available: false, reason: "OUT_OF_HOURS" };
     return NextResponse.json(res);
   }
 
-  // 営業時間チェック
+  // 利用時間チェック
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
   if (sh * 60 + sm < OPEN_MINUTES || eh * 60 + em > CLOSE_MINUTES) {
