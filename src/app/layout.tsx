@@ -3,8 +3,8 @@ import "./globals.css";
 import { ClientLayout } from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
-  title: "EIGHT CANAL BASE",
-  description: "EIGHT CANAL BASE LINE ミニアプリ",
+  title: "EIGHTBASE",
+  description: "EIGHTBASE - Eight Design シェアオフィス",
 };
 
 export default function RootLayout({

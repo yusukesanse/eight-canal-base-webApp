@@ -164,7 +164,7 @@ function ConfirmContent() {
   // confirm ステップ
   return (
     <div>
-      <TopBar title="EIGHT CANAL BASE 施設予約" subtitle="予約内容の確認" />
+      <TopBar title="EIGHTBASE 施設予約" subtitle="予約内容の確認" />
 
       <div className="p-3 space-y-3">
         <StepIndicator step={2} total={2} />
